@@ -1,11 +1,25 @@
 import argparse
+import logging
+from logging import StreamHandler
+import sys
+
 import serial
 import time
+import threading
 from os.path import exists
 
+
 class CwSerial:
-    rig_file = ""
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
+    handler = StreamHandler(stream=sys.stdout)
+    logger.addHandler(handler)
+
+    ser = None
     wpm_to_ms = 500
+    killcw = False
+
+    inprogress = False
 
     cw = {
         'A': '.-',
@@ -50,18 +64,27 @@ class CwSerial:
         ',': '--..--',
         '=': '-...-'}
 
-    def __init__(self, rigfile):
-        self.rig_file = rigfile
-        #print("rig_file:" + self.rig_file)
+    def __init__(self):
+        pass
 
-    def isDevice(self):
-        if exists(self.rig_file):
-            return True
+    def setDevice(self, port):
+        if exists(port):
+            self.logger.debug('CwSerial set port: ' + port)
+            self.ser = serial.Serial(port)
+            self.ser.setDTR(False)
         else:
-            raise Exception("Device file not found: " + self.rig_file)
+            raise Exception("Device file not found: " + port)
 
+    def breakcw(self):
+        self.killcw = True
+
+    def getKeying(self):
+        return self.inprogress
 
     def send(self, w, phrase):
+        if self.inprogress is True:
+            self.logger.debug('Skip cw already in cw')
+            return
         try:
             wpm = int(w)
         except Exception as ex:
@@ -77,41 +100,52 @@ class CwSerial:
 
         p = phrase.upper()
 
+        self.killcw = False
+        self.inprogress = True
+        t = threading.Thread(target=self._send, args=(wpm, p,))
+        t.start()
+        t.join()
+        self.inprogress = False
+
+        return "wpm: " + str(wpm) + ", phrase:" + p
+
+    def _send(self, wpm, phrase):
+        if self.ser is None:
+            return
+
         dit = round(self.wpm_to_ms / wpm * 3 / 1000, 4)
         dah = round(self.wpm_to_ms / wpm * 7 / 1000, 4)
 
         cwseq = ''
-        
-        for element in p:
+
+        for element in phrase:
             if element != ' ':
                 if element in self.cw:
                     cwseq += self.cw[element] + '1'
             else:
                 cwseq += '3'
 
-        ser = serial.Serial(self.rig_file)
-        ser.setDTR(False)
-        ser.setRTS(False)
-        time.sleep(dit)
+        time.sleep(0.1)
 
         for element in cwseq:
+            if self.killcw == True:
+                self.inprogress = False
+                break
+
             if element == '.':
-                ser.setDTR(True)
+                self.ser.setDTR(True)
                 time.sleep(dit)
-                ser.setDTR(False)
+                self.ser.setDTR(False)
                 time.sleep(dit)
             elif element == '-':
-                ser.setDTR(True)
+                self.ser.setDTR(True)
                 time.sleep(dah)
-                ser.setDTR(False)
+                self.ser.setDTR(False)
                 time.sleep(dit)
             else:
-                ser.setDTR(False)
                 space = dit * int(element)
                 time.sleep(space)
 
-
-        return "wpm: " + str(wpm) + ", phrase:" + p
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='cwserial')
