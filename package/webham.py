@@ -92,9 +92,6 @@ class Webham:
                             self.rig.state.rigport.parm.serial.parity = parity
 
                         self.rig.open()
-                        self.logger.debug('DTR: ' + str(self.rig.state.rigport.parm.serial.dtr_state))
-                        self.rig.state.rigport.parm.serial.dtr_state = 0
-                        self.logger.debug('DTR: ' + str(self.rig.state.rigport.parm.serial.dtr_state))
                         ser = serial.Serial(self.rigDevice)
                         ser.setDTR(False)
                         if self.rig.error_status == Hamlib.RIG_OK:
