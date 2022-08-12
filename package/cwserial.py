@@ -15,7 +15,7 @@ class CwSerial:
     handler = StreamHandler(stream=sys.stdout)
     logger.addHandler(handler)
 
-    ser = None
+    port = None
     wpm_to_ms = 500
     killcw = False
 
@@ -62,18 +62,21 @@ class CwSerial:
         '/': '-..-.',
         '.': '.-.-.-',
         ',': '--..--',
-        '=': '-...-'}
+        '=': '-...-',
+        'Ч': '---.',
+        'Ш': '----',
+        'Э': '..--..',
+        'Ю': '..--',
+        'Я': '.-.-'}
+
+    symb_en = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    symb_ru = 'АБЦДЕФГХИЙКЛМНОПЩРСТУЖВЬЫЗ'
 
     def __init__(self):
         pass
 
     def setDevice(self, port):
-        if exists(port):
-            self.logger.debug('CwSerial set port: ' + port)
-            self.ser = serial.Serial(port)
-            self.ser.setDTR(False)
-        else:
-            raise Exception("Device file not found: " + port)
+        self.port = port
 
     def breakcw(self):
         self.killcw = True
@@ -98,19 +101,47 @@ class CwSerial:
         if not phrase:
             return "error: phrase can't be empty"
 
+        if exists(self.port):
+            self.logger.debug('CwSerial set port: ' + self.port)
+            ser = serial.Serial()
+            ser.port = self.port
+            ser.rts = False
+            ser.dtr = False
+            ser.open()
+        else:
+            raise Exception("Device file not found: " + self.port)
+
         p = phrase.upper()
+
+        p_tr = ""
+        tr = False
+        for c in p:
+            for i, s in enumerate(self.symb_ru):
+                if c == s:
+                    p_tr += self.symb_en[i]
+                    tr = True
+                    break
+            if not tr:
+                p_tr += c
+            else:
+                tr = False
+
+        p = p_tr
+        self.logger.debug('CwSerial phrase: ' + p)
 
         self.killcw = False
         self.inprogress = True
-        t = threading.Thread(target=self._send, args=(wpm, p,))
+        t = threading.Thread(target=self._send, args=(wpm, p, ser,))
         t.start()
         t.join()
         self.inprogress = False
+        if ser.is_open:
+            ser.close()
 
         return "wpm: " + str(wpm) + ", phrase:" + p
 
-    def _send(self, wpm, phrase):
-        if self.ser is None:
+    def _send(self, wpm, phrase, ser):
+        if not ser.is_open:
             return
 
         dit = round(self.wpm_to_ms / wpm * 3 / 1000, 4)
@@ -128,19 +159,19 @@ class CwSerial:
         time.sleep(0.1)
 
         for element in cwseq:
-            if self.killcw == True:
+            if self.killcw:
                 self.inprogress = False
                 break
 
             if element == '.':
-                self.ser.setDTR(True)
+                ser.setDTR(True)
                 time.sleep(dit)
-                self.ser.setDTR(False)
+                ser.setDTR(False)
                 time.sleep(dit)
             elif element == '-':
-                self.ser.setDTR(True)
+                ser.setDTR(True)
                 time.sleep(dah)
-                self.ser.setDTR(False)
+                ser.setDTR(False)
                 time.sleep(dit)
             else:
                 space = dit * int(element)
@@ -158,5 +189,6 @@ if __name__ == '__main__':
     wpm = args.wpm
     phrase = args.phrase
 
-    cw = CwSerial(device)
+    cw = CwSerial()
+    cw.setDevice(device)
     print(cw.send(wpm, phrase))

@@ -341,6 +341,8 @@ def send_cw():
 def _send_cw(wpm, phrase):
     if cw.getKeying():
         return
+    if not wh.getStatus():
+        return
     wh.setPtt(1)
     time.sleep(0.5)
     r = cw.send(wpm, phrase)
