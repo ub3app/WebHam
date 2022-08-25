@@ -237,7 +237,7 @@ function clicksave() {
     databits = document.getElementById("DataBits").value;
     stopbits = document.getElementById("StopBits").value;
     parity = document.getElementById("Parity").value;
-    writedelay = document.getElementById("WriteDelay").value;
+    //writedelay = document.getElementById("WriteDelay").value;
 
     if (rig && port) {
         const data = {
@@ -246,8 +246,7 @@ function clicksave() {
             rigRate: rate,
             rigDataBits: databits,
             rigStopBits: stopbits,
-            rigParity: parity,
-            rigWriteDelay: writedelay
+            rigParity: parity
         }
         const urlParams = new URLSearchParams(data);
         url = '/set_rig?' + urlParams.toString();
