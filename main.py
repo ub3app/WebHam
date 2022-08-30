@@ -84,7 +84,7 @@ if sModel is not None and sDevice is not None:
 
 
 def main():
-    app.run(host=host, port=port)
+    app.run(host=host, port=port, ssl_context='adhoc')
     wh.close()
 
 

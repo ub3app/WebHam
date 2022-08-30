@@ -16,7 +16,7 @@ class CwSerial:
     logger.addHandler(handler)
 
     port = None
-    wpm_to_ms = 500
+    wpm_to_ms = 430
     killcw = False
 
     inprogress = False
